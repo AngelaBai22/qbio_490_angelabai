@@ -1,0 +1,21 @@
+#Bash
+
+#pwd: outputs the directory you are currently in
+#mkdir: creates a directory
+#cd<dir>: navigate into a specified directory, which is named inside the brackets <>
+#cd..: navigate into one directory above 
+#ls: states what is in your current directory
+#rm and the -r flag: delete the specified file or directory
+#scp: create a copy of directory and move elsewhere
+#nano (including Ctrl+o and Ctrl+x): opens the nano editor, Ctrl+o is to write out while editing a file through nano, and Ctrl+x is to exit 
+ 
+#Absolute Path: /mnt/c/Users/15713/Desktop
+#Relative Path: Users/15713/Desktop
+#scp Desktop/Example Folder Users/15713/Documents/Example Folder
+#cd ../Documents 
+
+#Nano
+#Go to the directory where you want to store the new document (ex: cd../Desktop), then type only “nano”
+#Ctrl+o, write the new document name on the text bar that pops up, then press Enter
+#Small edits, occasionally Github
+#Ex: There is a program and you mislabeled a variable name, can use Nano to change a few words
