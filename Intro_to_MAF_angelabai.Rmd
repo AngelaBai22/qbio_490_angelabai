@@ -1,0 +1,184 @@
+---
+title: "Intro to MAF" 
+author: Nicole Black, Wade Boohar
+date: 07/17/22
+updated: 09/17/23
+---
+
+***Deliverables***
+-Upload this R Notebook to your GitHub and submit the link to your Repo on BB.
+-Include any graphs or figures created in this assignment in the folder with your R notebook with descriptive file names.
+
+Since this is an optional partner activity, it is okay if your answers are the same as your partner’s as long as everyone understands it and could explain it in their own words if asked. Each person must individually push their code to Github. *At the top of your R Notebook, write the name of you and your partner(s) as a comment.*
+
+***Complete the following coding activity and answer any following questions as comments in your R Notebook***
+
+In MAF_Tutorial.Rmd, you looked at how to analyze mutation data in terms of clinical variables as well as mutation status. In this assignment, you will need to combine the two skills to demonstrate your understanding of categorical variables and R data structures.
+
+*Pre-Assignment*
+Load all necessary packages, read in the clinical data .csv file you have in your analysis_data folder, and instantiate the MAF_object.
+
+
+
+```{r setup}
+    knitr::opts_knit$set(root.dir = normalizePath("/Users/15713/Desktop/QBio490/qbio_490_angelabai/analysis_data")) 
+```
+
+
+
+```{r}
+clinic <- read.csv("C:/Users/15713/Desktop/QBio490/qbio_490_angelabai/analysis_data/brca_clinical_data.csv")
+
+maf_query <- GDCquery(
+    project = "TCGA-BRCA", 
+    data.category = "Simple Nucleotide Variation", 
+    access = "open", # we only have access to somatic mutations which are open access
+    data.type = "Masked Somatic Mutation", 
+    workflow.type = "Aliquot Ensemble Somatic Variant Merging and Masking"
+)
+
+#GDCdownload(maf_query)
+
+maf <-GDCprepare(maf_query) # as long as it runs, ignore any errors
+
+maf_object <- read.maf(maf = maf, 
+                       clinicalData = clinic,
+                       isTCGA = TRUE)
+```
+
+```{r}
+maf_object <- read.maf(maf = maf, 
+                       clinicalData = clinic,
+                       isTCGA = TRUE)
+```
+
+*1*
+Choose a clinical variable (or any variable from clin_rad or clin_drug) to separate your populations into two different groups and rewrite the column or create a new column with that variable as a factor. ***Do not use age or vital_status as your clinical variable.*** Hint: if your variable is continuous, you will need to determine your own cutoffs for the different levels of the factor. If your variable is categorical and has more than two possible values, choose the two that are the most common.
+```{r}
+
+with_tumor_mask <- ifelse(maf_object@clinical.data$tumor_status == 'WITH TUMOR', TRUE, FALSE)
+with_tumor_barcode <- maf_object@clinical.data$Tumor_Sample_Barcode[with_tumor_mask]
+
+with_tumor_maf <- subsetMaf(maf = maf_object,
+                            tsb = with_tumor_barcode)
+
+tumor_free_barcode <- maf_object@clinical.data$Tumor_Sample_Barcode[!with_tumor_mask]
+
+tumor_free_maf <- subsetMaf(maf = maf_object,
+                            tsb = tumor_free_barcode)
+
+```
+
+
+*2*
+Create a co-oncoplot with the top 10-20 (you choose) most mutated genes for the two groups. Pick one that has a large discrepancy in % mutated or type of mutations between the groups and research it. 
+Research it. What is the gene used for? Can you think of any reason for the discrepancy?
+```{r}
+#Oncoplot to identify top 20 genes 
+oncoplot(maf = maf_object,
+         top = 20,
+         borderCol = NA) 
+
+#CoOncoplot
+coOncoplot(m1 = with_tumor_maf, 
+           m2 = tumor_free_maf, 
+           m1Name = 'Patients with Tumor', 
+           m2Name = 'Patients without Tumor',
+           genes = c("TP53","PIK3CA","TTN","CDH1","GATA3","MUC16","KMT2C","MAP3K1","HMCN1","FLG","RYR2","SYNE1","PTEN","USH2A","NCOR1","ZFHX4","SPTA1","DMD","MUC17","NEB"),
+           borderCol = NA)
+
+#"Top" does not work, only outputs 6 genes(make normal oncoplot, find the top 10 genes, then write them down with "gene" command)
+
+
+#Short answer questions
+#1 The gene I picked is TP53, which has the largest discrepancy (4%) in percent mutated between the top 20 genes of these two groups.
+#2 TP53 is a tumor protein that acts as a tumor suppressor. Its primary role is facilitating normal cell division by regulating the expression of ~500 genes. Individuals who inherit a mutated version of this gene, called Li-Fraumeni Syndrome (LFS), have a 90% likelihood of developing cancer within their lifetimes. The most common cancers if LFS patients include breast cancer and soft tissue sarcoma. 
+#3 Mutations in TP53 often cause poor response to standard cancer treatments such as chemotherapy, radiotherapy, and hormonotherapy. This may help explain the discrepancy shown by the co-oncoplot. Patients with tumor have a greater percentage of this gene compared to patients without tumors, as TP53 mutations may inhibit treatment effectiveness and increase risk of tumor recurrence. 
+```
+
+
+```{r}
+View(maf_object@clinical.data)
+```
+
+
+*3*
+Create a contingency table with your variable and chosen gene. Run a Fisher’s Exact Test between presence of mutations for that gene and your clinical variable. Create and save a mosaic plot. 
+Interpret the output of the Fisher’s Exact Test in terms of the odds ratio and p-value.
+```{r}
+clinic$tumor_status <- factor(clinic$tumor_status, levels=c('WITH TUMOR', 'TUMOR FREE'))
+
+#Subsetting 
+with_mutation_mask <- ifelse(maf_object@data$Hugo_Symbol == 'TP53', TRUE, FALSE)
+with_mutation_barcode <- maf_object@data$Tumor_Sample_Barcode[with_tumor_mask]
+
+TP53_muts <- subsetMaf(maf = maf_object,
+                            tsb = with_mutation_barcode)
+
+#Use "in" to find patients with TP53
+clinic$mutation_status <- ifelse(clinic$Tumor_Sample_Barcode %in% TP53_muts@data$Tumor_Sample_Barcode, TRUE, FALSE)
+
+#Creating table
+contig <- table(clinic$tumor_status, clinic$mutation_status)
+
+contig
+
+#Fisher's Exact Test
+fisher_test <- fisher.test(contig)
+fisher_test
+
+#Mosaic Plot
+mosaicplot(contig)
+
+#Saving Mosaic Plot
+ggsave("C:/Users/15713/Desktop/QBio490/qbio_490_angelabai/mosaicplot_TP53muts_BRCA.png")
+
+#Short answer questions
+#1 The p-value I generated (0.91) is much larger than the 0.05 standard, which indicates that this data is not statistically significant. The null hypothesis is not rejected, meaning that no correlation was found between the presence of tumors and mutations in TP53.
+#2 The odds ratio is approximately 1.02, which can be characterized by the odds of finding TP53 mutations in a patient with tumor compared to odds of finding TP53 mutations in a patient without tumors. This indicates that patients with tumor are more likely to have TP53 mutations. The odds of having TP53 mutations in patients with tumor are 1.02 times greater than patients without tumors. 
+
+```
+
+
+*4*
+Subset your maf_object based on your chosen clinical variable and create a co-lollipop plot of your chosen gene divided between the two different clinical variable possibilities. Include descriptive names on your plot.
+Do you notice any difference in terms of mutations (e.g. sites, types, number) between the two populations?
+```{r}
+with_tumor_mask <- ifelse(maf_object@clinical.data$tumor_status == 'WITH TUMOR', TRUE, FALSE)
+with_tumor_barcode <- maf_object@clinical.data$Tumor_Sample_Barcode[with_tumor_mask]
+
+with_tumor_maf <- subsetMaf(maf = maf_object,
+                            tsb = with_tumor_barcode)
+
+tumor_free_barcode <- maf_object@clinical.data$Tumor_Sample_Barcode[!with_tumor_mask]
+
+tumor_free_maf <- subsetMaf(maf = maf_object,
+                            tsb = tumor_free_barcode)
+
+lollipopPlot2(m1 = with_tumor_maf, 
+              m2 = tumor_free_maf, 
+              m1_name = "Patients with Tumor",
+              m2_name = "Patients without Tumor",
+              gene = "TP53") 
+
+#Short answer questions
+#In both populations, mutations are mostly clustered within the P53 segment. Although this could be due to the large sample size, mutations present in the "patients with tumor" group are more spread across P53_TAD and P53_tetramer as well. Missense mutations are the most frequent mutation in the P53 segment, but rarely occur outside of this segment. To the right of P53, in P_53 tetramer and the gray area in between, frame shift deletion mutations are the most common. On one particular site, at the middle left of the P53 segment, 19 patient without tumors have a mutation.
+```
+
+
+*5*
+Create your Overall_Survival_Status column and create a mafSurvival KM plot based on mutations in your chosen gene.
+Does there seem to be a difference? Hypothesize why or not based on the other analysis you did with the gene above.
+```{r}
+#Creating overall_survival_status column
+maf_object@clinical.data$overall_survival_status <- ifelse(maf_object@clinical.data$vital_status == 'Alive', TRUE, FALSE)
+
+mafSurvival(maf = maf_object,
+            genes = "TP53",
+            time = "last_contact_days_to",
+            Status = "overall_survival_status", 
+            isTCGA = TRUE)
+
+#Short answer question
+#There is not a large difference in survival probability between patients with the tumor and patients with mutations in TP53. Using the Fisher's Exact test, it was found that the p-value when examining patients with tumors and presence of TP53 mutation was significantly higher than 0.05, indicating no relationship. Having a tumor indicates that the patient is still undergoing treatment or experiencing cancer recurrence. Since TP53 has no proven correlation with the "patient with tumor" population, its presence should not affect the survival probability.  
+```
